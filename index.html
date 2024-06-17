@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <title>Краснодарский край</title>
+    <link href="./kartografirovanie_zemelnyh_resursov.css" rel="stylesheet" />
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
+  </head>
+
+  <!-- const toggleableLayerIds = ["dop_kartogramma_id", "general_kartogramma_id"];
+  toggleableLayerIds.forEach((id) => { const input = document.getElementById(id);
+  input.addEventListener("change", function () { const layerId = this.value; // Проверяем, есть ли
+  слой на карте if (map.getLayer(layerId)) { // Получаем текущую видимость слоя const visibility =
+  map.getLayoutProperty(layerId, "visibility"); // Переключаем видимость слоя map.setLayoutProperty(
+  layerId, "visibility", visibility === "visible" ? "none" : "visible" ); } }); }); -->
+
+  <body>
+    <!-- Блок карты -->
+    <div id="map"></div>
+    <!-- Блок карты -->
+    <div class="map-overlay" id="year_info">
+      <span>Карта отражает данные по состоянию на 2016 год</span>
+    </div>
+    <!-- Блок выбора слоя -->
+    <div id="menu">
+      <input
+        id="general_kartogramma_id_menu"
+        type="checkbox"
+        class="layer-toggle"
+        value="general_kartogramma_id"
+        checked
+      />
+      <label for="general_kartogramma_id_menu">Коэффициент распаханности</label>
+      <input
+        id="dop_kartogramma_id_menu"
+        type="checkbox"
+        class="layer-toggle"
+        value="dop_kartogramma_id"
+      />
+      <label for="dop_kartogramma_id_menu">С/х угодья в площади района</label>
+      <input id="twi_id_menu" type="checkbox" class="layer-toggle" value="twi_id" />
+      <label for="twi_id_menu">Растр</label>
+    </div>
+    <!-- Блок вывода детальной информации -->
+    <div class="map-overlay" id="features">
+      <h2>Детальное значение</h2>
+      <div id="detailed_info"><p>Наведите на район</p></div>
+    </div>
+    <!-- Блок легенды -->
+    <div class="map-overlay" id="legend"></div>
+
+    <!-- javascript -->
+    <script>
+      // Инициализация карты
+      mapboxgl.accessToken =
+        "pk.eyJ1IjoidHJ1ZXNwZWFybWludCIsImEiOiJjbHVpbDl1bXcwNTg1MmltdjI2NmpsNXdpIn0.hTURiBYjIAijbKZnfQPdrg";
+      const map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/truespearmint/clst7etx0011u01pf3mj6b2ns",
+        center: [39.46, 45.17],
+        zoom: 6.9,
+      });
+
+      // События после загрузки карты
+      map.on("load", function () {
+        // Добавляем источник данных для картограмм
+        map.addSource("kartogramma", {
+          // может быть любое имя
+          type: "vector", // тип источника данных вашего слоя (может быть vector, raster, geojson и т.д.) ?
+          url: "mapbox://truespearmint.2ee32aj7", // tileset ID из Mapbox Studio Tilesets
+        });
+        // Добавляем слой основной картограммы, коэффициента распаханности
+        map.addLayer(
+          {
+            id: "general_kartogramma_id", // уникальный идентификатор вашего слоя, можно назначить любым
+            type: "fill", // тип слоя, например, fill, line, symbol и т.д.
+            source: "kartogramma",
+            "source-layer": "kda_selhoz_kartogramma2016-8z5t7t", // имя тайлсета. То как называются данные после загрузки
+            layout: { visibility: "visible" },
+            paint: {
+              "fill-color": [
+                // изменяем цвет по свойству
+                "step",
+                ["coalesce", ["get", "k_raspahonosti"], 0], // используем coalesce для замены null на 0
+                "#fff9e5",
+                0.7,
+                "#ffeeb5",
+                0.9,
+                "#e9c187",
+                0.95,
+                "#ce8f56",
+                0.97,
+                "#b15627",
+              ],
+            },
+          },
+          "borders-ru-ad-culzka" // название слоя из стиля mapbox, под которым должен лежать наш слой dop_kartogramma_id
+        );
+        // Добавляем слой дополнительной картограммы, удельного веса с/х угодий
+        map.addLayer(
+          {
+            id: "dop_kartogramma_id", // уникальный идентификатор вашего слоя, можно назначить любым
+            type: "fill", // тип вашего слоя, например, fill, line, symbol и т.д.
+            source: "kartogramma",
+            "source-layer": "kda_selhoz_kartogramma2016-8z5t7t", // имя тайлсета. То как называются данные после загрузки
+            layout: { visibility: "none" },
+            paint: {
+              "fill-color": [
+                // изменяем цвет по свойству
+                "step",
+                ["coalesce", ["get", "percent_selhoz_ygodia"], 0], // используем coalesce для замены null на 0
+                "#f7fcf5",
+                80,
+                "#c9eac2",
+                85,
+                "#7bc77c",
+                90,
+                "#2a924b",
+                95,
+                "#007c30",
+              ],
+            },
+          },
+          "borders-ru-ad-culzka" // название слоя из стиля mapbox, под которым должен лежать наш слой dop_kartogramma_id
+        );
+        map.addSource("twi_source", {
+          // может быть любое имя
+          type: "raster", // тип источника данных вашего слоя (может быть vector, raster, geojson и т.д.) ?
+          url: "mapbox://truespearmint.3gwm5pa5", // tileset ID из Mapbox Studio Tilesets
+        });
+        // Добавляем слой основной картограммы, коэффициента распаханности
+        map.addLayer(
+          {
+            id: "twi_id", // уникальный идентификатор вашего слоя, можно назначить любым
+            type: "raster", // тип слоя, например, fill, line, symbol и т.д.
+            source: "twi_source",
+            "source-layer": "temp5-a0wk6h", // имя тайлсета. То как называются данные после загрузки
+            layout: { visibility: "none" },
+            /*"raster-color": {
+              // использование функции "interpolate" для задания интерполяции цветов
+              type: "interpolate",
+              // определение интервалов значений и цветов
+              stops: [
+                [-12, "#f7fcf5"],
+                [-11, "#f07c4a"],
+                [-10, "#fec980"],
+                [-9, "#ffffbf"],
+                [-8, "#c7e8ad"],
+                // определите другие интервалы при необходимости
+              ],
+            },*/
+          },
+          "borders-ru-ad-culzka" // название слоя из стиля mapbox, под которым должен лежать наш слой dop_kartogramma_id
+        );
+
+        // Функция для создания легенды на основе переданных данных о слоях и цветах
+        function createLegend(steps, colors) {
+          const legend = document.getElementById("legend"); // Получаем ссылку на элемент легенды
+          legend.innerHTML = ""; // Очищаем легенду перед добавлением новых значений
+          // Для каждого шага и цвета создаем соответствующий элемент легенды
+          steps.forEach((layer, i) => {
+            const color = colors[i];
+            const item = document.createElement("div");
+            const key = document.createElement("span");
+            key.className = "legend-key";
+            key.style.backgroundColor = color;
+            const value = document.createElement("span");
+            value.innerHTML = `${layer}`;
+            item.appendChild(key);
+            item.appendChild(value);
+            legend.appendChild(item);
+          });
+        }
+
+        // Массивы ступеней и значений для легенды
+        const steps_gen = ["0 - 0.7", "0.7 - 0.9", "0.9 - 0.95", "0.95 - 0.97", "0.97 - 1"];
+        const colors_gen = ["#fff9e5", "#ffeeb5", "#e9c187", "#ce8f56", "#b15627"];
+        const steps_dop = ["0 - 80 %", "80 - 85 %", "85 - 90 %", "90 - 95 %", "95 - 100 %"];
+        const colors_dop = ["#f7fcf5", "#c9eac2", "#7bc77c", "#2a924b", "#007c30"];
+
+        // Создаем легенду для первого слоя
+        createLegend(steps_gen, colors_gen);
+
+        // Функция для обновления легенды в соответствии с выбранным слоем
+        function udetailed_infoateLegend(layerId) {
+          // Определяем, какие шаги и цвета использовать в зависимости от выбранного слоя
+          let selectedSteps, selectedColors;
+          switch (layerId) {
+            case "general_kartogramma_id":
+              selectedSteps = steps_gen;
+              selectedColors = colors_gen;
+              break;
+            case "dop_kartogramma_id":
+              selectedSteps = steps_dop;
+              selectedColors = colors_dop;
+              break;
+            // Добавьте кейсы для других слоев по мере необходимости
+            default:
+              // Если слой не найден, отображаем сообщение
+              legend.innerHTML = "Выберите слой для просмотра легенды";
+              return;
+          }
+          // Создаем легенду с помощью функции createLegend, используя выбранные шаги и цвета
+          createLegend(selectedSteps, selectedColors);
+        }
+
+        // Переключение слоёв по чекбоксам
+        const toggleableLayerIds = ["dop_kartogramma_id", "general_kartogramma_id", "twi_id"]; // перечисляем список слоёв, которые можно будет переключать. Названия не зависят от addLayer (id:), но для удобства названы также
+        const menu = document.getElementById("menu"); // gолучаем ссылку на элемент с id="menu"
+        menu.addEventListener("change", function (event) {
+          const clickedLayerId = event.target.value; // target - синтаксис js, вернее даже DOM
+          toggleableLayerIds.forEach((layerId) => {
+            const input = document.getElementById(layerId + "_menu");
+            if (layerId === clickedLayerId) {
+              map.setLayoutProperty(layerId, "visibility", "visible");
+              input.checked = true;
+              udetailed_infoateLegend(clickedLayerId);
+            } else {
+              map.setLayoutProperty(layerId, "visibility", "none");
+              input.checked = false;
+              udetailed_infoateLegend(clickedLayerId);
+            }
+          });
+        });
+
+        // Изменение вида курсора при наведении на слои
+        map.on("mousemove", toggleableLayerIds, () => {
+          map.getCanvas().style.cursor = "pointer"; // изменение курсора на pointer в рамках карты (вторая часть - свойство html)
+        });
+        map.on("mouseleave", toggleableLayerIds, () => {
+          map.getCanvas().style.cursor = ""; // сбросить стиль курсора
+        });
+
+        // Отображение дополнительных данных
+        map.on("mousemove", (event) => {
+          const detailedList = map.queryRenderedFeatures(event.point, {
+            // в постоянную detailedList записывается массив объектов GeoJSON, расположенных в области движения мыши,
+            layers: ["dop_kartogramma_id", "general_kartogramma_id"], // в области движения мыши, но только из перечисленных слоёв
+          });
+
+          // если detailedList.length не равняется нулю, то записывается его имя и плотность населения, иначе  добавялется текст "Наведите на район"
+          let infoHTML = "<p>Наведите на район</p>";
+          if (detailedList.length) {
+            const properties = detailedList[0].properties;
+            const layerId = detailedList[0].layer.id;
+            const propertyName =
+              layerId === "general_kartogramma_id" ? "k_raspahonosti" : "percent_selhoz_ygodia";
+            infoHTML = `<h3>${properties.name}</h3><p><strong><em>${properties[
+              propertyName
+            ].toFixed(2)}</strong> ${
+              propertyName === "k_raspahonosti" ? "коэффициент распаханности" : "%"
+            }</em></p>`;
+          }
+
+          document.getElementById("detailed_info").innerHTML = infoHTML;
+        });
+
+        // Сброс содержимого при уходе курсора с слоя
+        map.on("mouseleave", () => {
+          document.getElementById("detailed_info").innerHTML = "<p>Наведите на район</p>";
+        });
+      });
+    </script>
+  </body>
+</html>
