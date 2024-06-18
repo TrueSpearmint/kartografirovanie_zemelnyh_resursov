@@ -9,17 +9,10 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
   </head>
 
-  <!-- const toggleableLayerIds = ["dop_kartogramma_id", "general_kartogramma_id"];
-  toggleableLayerIds.forEach((id) => { const input = document.getElementById(id);
-  input.addEventListener("change", function () { const layerId = this.value; // Проверяем, есть ли
-  слой на карте if (map.getLayer(layerId)) { // Получаем текущую видимость слоя const visibility =
-  map.getLayoutProperty(layerId, "visibility"); // Переключаем видимость слоя map.setLayoutProperty(
-  layerId, "visibility", visibility === "visible" ? "none" : "visible" ); } }); }); -->
-
   <body>
     <!-- Блок карты -->
     <div id="map"></div>
-    <!-- Блок карты -->
+    <!-- Блок инфо года -->
     <div class="map-overlay" id="year_info">
       <span>Карта отражает данные по состоянию на 2016 год</span>
     </div>
@@ -40,8 +33,8 @@
         value="dop_kartogramma_id"
       />
       <label for="dop_kartogramma_id_menu">С/х угодья в площади района</label>
-      <input id="twi_id_menu" type="checkbox" class="layer-toggle" value="twi_id" />
-      <label for="twi_id_menu">Растр</label>
+      <input id="slope_layer_menu" type="checkbox" class="layer-toggle" value="slope_layer" />
+      <label for="slope_layer_menu">Крутизна склонов</label>
     </div>
     <!-- Блок вывода детальной информации -->
     <div class="map-overlay" id="features">
@@ -125,34 +118,23 @@
           },
           "borders-ru-ad-culzka" // название слоя из стиля mapbox, под которым должен лежать наш слой dop_kartogramma_id
         );
-        map.addSource("twi_source", {
-          // может быть любое имя
-          type: "raster", // тип источника данных вашего слоя (может быть vector, raster, geojson и т.д.) ?
-          url: "mapbox://truespearmint.3gwm5pa5", // tileset ID из Mapbox Studio Tilesets
+        map.addSource("slope_source", {
+          type: "raster",
+          tiles: [
+            "https://pushkino-maps.ru/geoserver/gwc/service/wmts?SERVICE=WMTS&VERSION=1.1.1&REQUEST=GetTile&LAYER=kart_zemel_res:slope&STYLE=&TILEMATRIXSET=EPSG:900913&TILEMATRIX=EPSG:900913:{z}&TILECOL={x}&TILEROW={y}&FORMAT=image/png",
+          ],
+          tileSize: 512,
+          bounds: [36.44010906057202, 43.3588319718386, 41.9137755598114, 46.907704869568455],
         });
-        // Добавляем слой основной картограммы, коэффициента распаханности
         map.addLayer(
           {
-            id: "twi_id", // уникальный идентификатор вашего слоя, можно назначить любым
-            type: "raster", // тип слоя, например, fill, line, symbol и т.д.
-            source: "twi_source",
-            "source-layer": "temp5-a0wk6h", // имя тайлсета. То как называются данные после загрузки
+            id: "slope_layer",
+            type: "raster",
+            source: "slope_source",
+            "source-layer": "slope",
             layout: { visibility: "none" },
-            /*"raster-color": {
-              // использование функции "interpolate" для задания интерполяции цветов
-              type: "interpolate",
-              // определение интервалов значений и цветов
-              stops: [
-                [-12, "#f7fcf5"],
-                [-11, "#f07c4a"],
-                [-10, "#fec980"],
-                [-9, "#ffffbf"],
-                [-8, "#c7e8ad"],
-                // определите другие интервалы при необходимости
-              ],
-            },*/
           },
-          "borders-ru-ad-culzka" // название слоя из стиля mapbox, под которым должен лежать наш слой dop_kartogramma_id
+          "borders-ru-ad-culzka"
         );
 
         // Функция для создания легенды на основе переданных данных о слоях и цветах
@@ -184,18 +166,28 @@
         createLegend(steps_gen, colors_gen);
 
         // Функция для обновления легенды в соответствии с выбранным слоем
-        function udetailed_infoateLegend(layerId) {
+        function updateLegend(layerId) {
           // Определяем, какие шаги и цвета использовать в зависимости от выбранного слоя
           let selectedSteps, selectedColors;
           switch (layerId) {
             case "general_kartogramma_id":
               selectedSteps = steps_gen;
               selectedColors = colors_gen;
+              legend.style.width = "90px";
+              legend.style.height = "90px";
               break;
             case "dop_kartogramma_id":
               selectedSteps = steps_dop;
               selectedColors = colors_dop;
+              legend.style.width = "95px";
+              legend.style.height = "90px";
               break;
+            case "slope_layer":
+              // Вставляем картинку легенды для slope_layer
+              legend.innerHTML = `<img src="https://pushkino-maps.ru/geoserver/gwc/service/wms?REQUEST=GetLegendGraphic&LAYER=kart_zemel_res:slope&format=image/png&LEGEND_OPTIONS=mx:0.1;my:0.1;" alt="Легенда карты" />`;
+              legend.style.width = "100px";
+              legend.style.height = "200px";
+              return; // Возвращаемся здесь, чтобы не выполнять createLegend
             // Добавьте кейсы для других слоев по мере необходимости
             default:
               // Если слой не найден, отображаем сообщение
@@ -207,7 +199,8 @@
         }
 
         // Переключение слоёв по чекбоксам
-        const toggleableLayerIds = ["dop_kartogramma_id", "general_kartogramma_id", "twi_id"]; // перечисляем список слоёв, которые можно будет переключать. Названия не зависят от addLayer (id:), но для удобства названы также
+        const toggleableLayerIds = ["dop_kartogramma_id", "general_kartogramma_id", "slope_layer"]; // перечисляем список слоёв, которые можно будет переключать. Названия не зависят от addLayer (id:), но для удобства названы также
+        var activeLayer = "general_kartogramma_id"; // Переменная для хранения активного слоя
         const menu = document.getElementById("menu"); // gолучаем ссылку на элемент с id="menu"
         menu.addEventListener("change", function (event) {
           const clickedLayerId = event.target.value; // target - синтаксис js, вернее даже DOM
@@ -216,18 +209,19 @@
             if (layerId === clickedLayerId) {
               map.setLayoutProperty(layerId, "visibility", "visible");
               input.checked = true;
-              udetailed_infoateLegend(clickedLayerId);
+              updateLegend(clickedLayerId);
+              activeLayer = clickedLayerId; // Обновляем активный слой
             } else {
               map.setLayoutProperty(layerId, "visibility", "none");
               input.checked = false;
-              udetailed_infoateLegend(clickedLayerId);
+              updateLegend(clickedLayerId);
             }
           });
         });
 
         // Изменение вида курсора при наведении на слои
         map.on("mousemove", toggleableLayerIds, () => {
-          map.getCanvas().style.cursor = "pointer"; // изменение курсора на pointer в рамках карты (вторая часть - свойство html)
+          map.getCanvas().style.cursor = "pointer";
         });
         map.on("mouseleave", toggleableLayerIds, () => {
           map.getCanvas().style.cursor = ""; // сбросить стиль курсора
@@ -260,6 +254,48 @@
         // Сброс содержимого при уходе курсора с слоя
         map.on("mouseleave", () => {
           document.getElementById("detailed_info").innerHTML = "<p>Наведите на район</p>";
+        });
+
+        map.on("mousemove", (e) => {
+          if (activeLayer === "slope_layer") {
+            // Проверка, активен ли слой "slope_layer". Произведена именно так, а не "mousemove","slope_layer",(e) => ибо имеем дело с растром, а значит у него нет features для определения
+            const coordinates = e.point; // пиксельные координаты карты
+            const coordinates_x = coordinates.x;
+            const coordinates_y = coordinates.y;
+            const width = map.getCanvas().clientWidth; // ширина окна пользователя
+            const height = map.getCanvas().clientHeight; // высота окна пользователя
+            const bounds = map.getBounds(); // крайние координаты окна пользователя
+            const bbox = [
+              bounds.getWest(),
+              bounds.getSouth(),
+              bounds.getEast(),
+              bounds.getNorth(),
+            ].join(",");
+            const url = `https://pushkino-maps.ru/geoserver/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo&LAYERS=kart_zemel_res:slope&STYLES&CRS=EPSG:4326&FORMAT=image/png&bbox=${bbox}&WIDTH=${width}&HEIGHT=${height}&QUERY_LAYERS=kart_zemel_res:slope&INFO_FORMAT=application/json&FEATURE_COUNT=1&X=${coordinates_x}&Y=${coordinates_y}&EXCEPTIONS=application/vnd.ogc.se_xml`;
+
+            fetch(url)
+              .then((response) => {
+                // Проверка статуса ответа
+                if (!response.ok) {
+                  throw new Error("Network response was not ok " + response.statusText);
+                }
+                return response.text();
+              })
+              .then((data) => {
+                // Отладочное сообщение для данных
+                const responsejson = JSON.parse(data);
+                // Извлечение значения GRAY_INDEX
+                const grayIndex = responsejson.features[0].properties.GRAY_INDEX;
+                console.log("Ответ сервера:", grayIndex);
+                const grayIndexFixed = grayIndex.toFixed(4);
+                // Отображение значения в элементе detailed_info
+                detailed_info.innerHTML = `<p><em>Крутизна склона: <strong>${grayIndexFixed}</strong></em></p>`;
+              })
+              .catch((error) => {
+                // Сообщение об ошибке
+                console.error("Ошибка:", error);
+              });
+          }
         });
       });
     </script>
